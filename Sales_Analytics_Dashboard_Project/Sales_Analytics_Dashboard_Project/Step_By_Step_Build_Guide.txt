@@ -1,0 +1,238 @@
+============================================================
+  POWER BI CAPSTONE — STEP-BY-STEP BUILD GUIDE
+  Project: Sales Analytics Dashboard
+  Deadline: April 21, 2026
+============================================================
+
+
+────────────────────────────────────────────────────────────
+  STEP 1 — IMPORT DATA
+────────────────────────────────────────────────────────────
+
+1. Open Power BI Desktop
+2. Click Home → Get Data → Excel Workbook
+3. Browse to Sales_Analytics_Data.xlsx
+4. In Navigator, select ALL four sheets:
+   ✔ Sales
+   ✔ Products
+   ✔ Customers
+   ✔ Targets
+5. Click Transform Data (NOT Load yet)
+
+
+────────────────────────────────────────────────────────────
+  STEP 2 — APPLY POWER QUERY TRANSFORMATIONS
+────────────────────────────────────────────────────────────
+
+For each query in Power Query Editor:
+1. Select the query (left panel)
+2. Home → Advanced Editor
+3. Paste the corresponding M code from PowerQuery_M_Code.txt
+4. Click Done
+
+Then click: Home → Close & Apply
+
+
+────────────────────────────────────────────────────────────
+  STEP 3 — CREATE DATE TABLE
+────────────────────────────────────────────────────────────
+
+1. Home → Transform Data → Power Query Editor
+2. Home → New Source → Blank Query
+3. Rename query to "DateTable"
+4. Open Advanced Editor, paste the DateTable M code
+5. Close & Apply
+6. Back in Power BI: Table Tools → Mark as Date Table
+   → Date column = "Date"
+
+
+────────────────────────────────────────────────────────────
+  STEP 4 — BUILD DATA MODEL (Relationships)
+────────────────────────────────────────────────────────────
+
+1. Click Model view (left sidebar, looks like a diagram)
+2. Drag to create relationships:
+   • Sales[CustomerID]  → Customers[CustomerID]
+   • Sales[ProductID]   → Products[ProductID]
+   • Sales[OrderDate]   → DateTable[Date]
+3. Verify all are Many-to-One (*→1)
+4. Filter direction: Single (Dimension → Fact)
+
+
+────────────────────────────────────────────────────────────
+  STEP 5 — CREATE MEASURES TABLE
+────────────────────────────────────────────────────────────
+
+1. Home → Enter Data → name it "_Measures" → Load
+2. Modeling → New Measure
+3. Paste each measure from DAX_Measures.txt one by one
+4. Organize measures into Display Folders:
+   • Revenue KPIs
+   • Time Intelligence
+   • Target Analysis
+   • Customer Analytics
+   • Product Analytics
+
+
+────────────────────────────────────────────────────────────
+  STEP 6 — BUILD PAGE 1: EXECUTIVE SUMMARY
+────────────────────────────────────────────────────────────
+
+Visual 1 — KPI Cards (top row, 4 cards)
+  • Total Revenue       Format: ₹0.00 Bn
+  • Total Profit        Format: ₹0.00 Bn
+  • Profit Margin %     Format: 0.0%
+  • Total Orders        Format: #,0
+
+Visual 2 — Revenue Trend (Line Chart)
+  • Axis:   DateTable[MonthName] + DateTable[Year]
+  • Values: Total Revenue, Revenue LY
+  • Legend: on
+  • Title:  "Monthly Revenue Trend (2023 vs 2024)"
+
+Visual 3 — Revenue by Region (Donut Chart)
+  • Legend: Customers[Region]
+  • Values: Total Revenue
+  • Title:  "Revenue by Region"
+
+Visual 4 — Top 5 Products (Bar Chart)
+  • Y-Axis: Products[ProductName] (TopN filter: 5 by Revenue)
+  • X-Axis: Total Revenue
+  • Title:  "Top 5 Products by Revenue"
+
+Visual 5 — Revenue vs Target (Gauge)
+  • Value:   Total Revenue
+  • Target:  Total Target
+  • Max:     Total Target * 1.2
+
+Slicers (top-right):
+  • DateTable[Year]
+  • Customers[Region]
+  • DateTable[Quarter]
+
+
+────────────────────────────────────────────────────────────
+  STEP 7 — BUILD PAGE 2: SALES DEEP DIVE
+────────────────────────────────────────────────────────────
+
+Visual 1 — Matrix Table
+  Rows:    Products[Category] → Products[SubCategory]
+  Columns: DateTable[Quarter]
+  Values:  Total Revenue, Total Profit, Profit Margin %
+  Enable:  Row subtotals, Column subtotals
+
+Visual 2 — Scatter Chart (Quantity vs Revenue)
+  X:      Total Quantity
+  Y:      Total Revenue
+  Size:   Total Profit
+  Legend: Products[Category]
+  Title:  "Product Performance Matrix"
+
+Visual 3 — Waterfall Chart
+  Category: DateTable[MonthName]
+  Y-Axis:   Revenue YoY Growth
+  Title:    "Month-over-Month Revenue Change"
+
+Visual 4 — Ribbon Chart
+  Axis:   DateTable[MonthName]
+  Legend: Products[Category]
+  Values: Total Revenue
+  Title:  "Category Revenue Trend"
+
+
+────────────────────────────────────────────────────────────
+  STEP 8 — BUILD PAGE 3: CUSTOMER & REGION ANALYSIS
+────────────────────────────────────────────────────────────
+
+Visual 1 — Map Visual
+  Location: Customers[City]
+  Size:     Total Revenue
+  Color:    Profit Margin %
+
+Visual 2 — Customer Segment Bar Chart
+  Axis:   Customers[Segment]
+  Values: Total Revenue, Total Orders, Unique Customers
+
+Visual 3 — Treemap
+  Group:  Customers[Region] → Customers[State]
+  Values: Total Revenue
+  Title:  "Revenue by State"
+
+Visual 4 — KPI Cards (bottom row)
+  • Unique Customers
+  • Revenue per Customer
+  • Avg Order Value
+  • Discounted Orders
+
+
+────────────────────────────────────────────────────────────
+  STEP 9 — BUILD PAGE 4: TARGET ANALYSIS
+────────────────────────────────────────────────────────────
+
+Visual 1 — Clustered Bar Chart
+  Y-Axis: Customers[Region]
+  Values: Total Revenue (actual), Total Target
+  Title:  "Actual vs Target by Region"
+
+Visual 2 — Line and Clustered Column
+  Shared Axis: DateTable[MonthName]
+  Column:      Total Revenue
+  Line:        Total Target
+  Title:       "Monthly Revenue vs Target"
+
+Visual 3 — Table with Conditional Formatting
+  Columns: Region | Total Revenue | Total Target |
+           Achievement % | Target Gap | Above Target
+  Conditional Format: Achievement% column →
+     Green (≥100%) → Yellow (80-99%) → Red (<80%)
+
+Visual 4 — Card
+  • Achievement % (overall)
+  Format:     0.0%
+  Color rule: >100% → Green, else Red
+
+
+────────────────────────────────────────────────────────────
+  STEP 10 — FORMATTING & POLISH
+────────────────────────────────────────────────────────────
+
+Theme:
+  1. View → Themes → Browse → Import a theme
+     OR use built-in: "Executive"
+
+Page background:
+  Format Page → Canvas Background → Color #F4F6F9, 100%
+
+Each visual:
+  • Enable Title (bold, size 13)
+  • Enable Border: rounded, subtle grey
+  • Data labels: on (where applicable)
+  • Tooltips: add extra measures (Profit Margin %, YoY %)
+
+Navigation buttons:
+  Insert → Buttons → Page Navigator
+  Place at top of each page
+
+Report title:
+  Insert → Text Box → "Sales Analytics Dashboard 2023–2024"
+  Font: Segoe UI, 18pt, Bold, Color: #1F3864
+
+
+────────────────────────────────────────────────────────────
+  STEP 11 — SAVE & EXPORT
+────────────────────────────────────────────────────────────
+
+1. File → Save As → "Sales_Analytics_Dashboard.pbix"
+2. File → Export → Export to PDF (for screenshots)
+3. Take screenshots of each page for documentation
+
+
+────────────────────────────────────────────────────────────
+  STEP 12 — PUBLISH (Optional but impressive)
+────────────────────────────────────────────────────────────
+
+1. Home → Publish → Select "My Workspace"
+2. Get the share link from Power BI Service
+3. Include link in submission form
+
+============================================================

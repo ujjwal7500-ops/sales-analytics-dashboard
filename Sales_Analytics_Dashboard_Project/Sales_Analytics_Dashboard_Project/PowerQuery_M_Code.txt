@@ -1,0 +1,200 @@
+============================================================
+  POWER BI CAPSTONE PROJECT — POWER QUERY M CODE
+  Apply each block inside: Transform Data → Advanced Editor
+============================================================
+
+
+────────────────────────────────────────────────────────────
+  QUERY 1 — Sales (Main Fact Table)
+────────────────────────────────────────────────────────────
+
+let
+    Source = Excel.Workbook(
+                 File.Contents("Sales_Analytics_Data.xlsx"),
+                 null, true),
+    Sales_Sheet = Source{[Item="Sales", Kind="Sheet"]}[Data],
+    PromotedHeaders = Table.PromoteHeaders(Sales_Sheet,
+                          [PromoteAllScalars=true]),
+
+    // ── TYPE CASTING ──────────────────────────────────────
+    ChangedTypes = Table.TransformColumnTypes(PromotedHeaders, {
+        {"OrderID",    type text},
+        {"OrderDate",  type date},
+        {"CustomerID", type text},
+        {"ProductID",  type text},
+        {"Quantity",   Int64.Type},
+        {"UnitPrice",  type number},
+        {"Discount",   type number},
+        {"Revenue",    type number},
+        {"COGS",       type number},
+        {"Profit",     type number},
+        {"ShipMode",   type text}
+    }),
+
+    // ── DERIVED COLUMNS ───────────────────────────────────
+    AddYear = Table.AddColumn(ChangedTypes, "Year",
+                  each Date.Year([OrderDate]), Int64.Type),
+
+    AddMonth = Table.AddColumn(AddYear, "Month",
+                   each Date.Month([OrderDate]), Int64.Type),
+
+    AddMonthName = Table.AddColumn(AddMonth, "MonthName",
+                       each Date.ToText([OrderDate], "MMM"),
+                       type text),
+
+    AddQuarter = Table.AddColumn(AddMonthName, "Quarter",
+                     each "Q" & Text.From(Date.QuarterOfYear([OrderDate])),
+                     type text),
+
+    AddProfitFlag = Table.AddColumn(AddQuarter, "ProfitFlag",
+                        each if [Profit] >= 0 then "Profitable"
+                             else "Loss",
+                        type text),
+
+    AddDiscountBand = Table.AddColumn(AddProfitFlag, "DiscountBand",
+                          each if [Discount] = 0       then "No Discount"
+                               else if [Discount] <= 0.05 then "Low (≤5%)"
+                               else if [Discount] <= 0.10 then "Medium (≤10%)"
+                               else "High (>10%)",
+                          type text),
+
+    // ── REMOVE NULLS ──────────────────────────────────────
+    RemovedNulls = Table.SelectRows(AddDiscountBand,
+                       each [OrderID] <> null
+                            and [CustomerID] <> null
+                            and [ProductID] <> null),
+
+    // ── SORT ──────────────────────────────────────────────
+    SortedRows = Table.Sort(RemovedNulls,
+                     {{"OrderDate", Order.Ascending}})
+in
+    SortedRows
+
+
+────────────────────────────────────────────────────────────
+  QUERY 2 — Products (Dimension Table)
+────────────────────────────────────────────────────────────
+
+let
+    Source = Excel.Workbook(
+                 File.Contents("Sales_Analytics_Data.xlsx"),
+                 null, true),
+    Products_Sheet = Source{[Item="Products", Kind="Sheet"]}[Data],
+    PromotedHeaders = Table.PromoteHeaders(Products_Sheet,
+                          [PromoteAllScalars=true]),
+
+    ChangedTypes = Table.TransformColumnTypes(PromotedHeaders, {
+        {"ProductID",    type text},
+        {"ProductName",  type text},
+        {"Category",     type text},
+        {"SubCategory",  type text},
+        {"CostPrice",    type number},
+        {"SellingPrice", type number},
+        {"Margin%",      type number}
+    }),
+
+    // Add price tier
+    AddPriceTier = Table.AddColumn(ChangedTypes, "PriceTier",
+                       each if [SellingPrice] >= 20000 then "Premium"
+                            else if [SellingPrice] >= 5000 then "Mid-Range"
+                            else "Budget",
+                       type text)
+in
+    AddPriceTier
+
+
+────────────────────────────────────────────────────────────
+  QUERY 3 — Customers (Dimension Table)
+────────────────────────────────────────────────────────────
+
+let
+    Source = Excel.Workbook(
+                 File.Contents("Sales_Analytics_Data.xlsx"),
+                 null, true),
+    Customers_Sheet = Source{[Item="Customers", Kind="Sheet"]}[Data],
+    PromotedHeaders = Table.PromoteHeaders(Customers_Sheet,
+                          [PromoteAllScalars=true]),
+
+    ChangedTypes = Table.TransformColumnTypes(PromotedHeaders, {
+        {"CustomerID",   type text},
+        {"CustomerName", type text},
+        {"Segment",      type text},
+        {"City",         type text},
+        {"State",        type text},
+        {"Region",       type text}
+    }),
+
+    // ── CAPITALIZE NAMES ──────────────────────────────────
+    CapitalizeCity = Table.TransformColumns(ChangedTypes,
+                         {{"City",  Text.Proper},
+                          {"State", Text.Proper}})
+in
+    CapitalizeCity
+
+
+────────────────────────────────────────────────────────────
+  QUERY 4 — Targets (Dimension Table)
+────────────────────────────────────────────────────────────
+
+let
+    Source = Excel.Workbook(
+                 File.Contents("Sales_Analytics_Data.xlsx"),
+                 null, true),
+    Targets_Sheet = Source{[Item="Targets", Kind="Sheet"]}[Data],
+    PromotedHeaders = Table.PromoteHeaders(Targets_Sheet,
+                          [PromoteAllScalars=true]),
+
+    ChangedTypes = Table.TransformColumnTypes(PromotedHeaders, {
+        {"Region", type text},
+        {"Month",  Int64.Type},
+        {"Year",   Int64.Type},
+        {"Target", type number}
+    }),
+
+    // ── ADD MONTH NAME ────────────────────────────────────
+    AddMonthName = Table.AddColumn(ChangedTypes, "MonthName",
+                       each Date.ToText(
+                                #date([Year], [Month], 1),
+                                "MMM"),
+                       type text),
+
+    AddYearMonth = Table.AddColumn(AddMonthName, "YearMonth",
+                       each Text.From([Year]) & "-"
+                            & Text.PadStart(Text.From([Month]), 2, "0"),
+                       type text)
+in
+    AddYearMonth
+
+
+────────────────────────────────────────────────────────────
+  QUERY 5 — DateTable (Mark as Date Table in Power BI)
+────────────────────────────────────────────────────────────
+-- (See DAX_Measures.txt for the M code for DateTable)
+-- After creating: Table Tools → Mark as Date Table → Date column
+
+
+────────────────────────────────────────────────────────────
+  DATA MODEL RELATIONSHIPS
+────────────────────────────────────────────────────────────
+
+  Sales[CustomerID]  →  Customers[CustomerID]   (Many-to-One)
+  Sales[ProductID]   →  Products[ProductID]     (Many-to-One)
+  Sales[OrderDate]   →  DateTable[Date]         (Many-to-One)
+  Targets[Region]    →  (link via slicer/filter, not direct)
+
+  All relationships: Single direction filter from Dimension → Fact
+
+
+────────────────────────────────────────────────────────────
+  PERIOD TABLE (Disconnected — for dynamic slicer)
+────────────────────────────────────────────────────────────
+
+let
+    Source = #table(
+                 type table [Period = text],
+                 {{"MTD"}, {"QTD"}, {"YTD"}, {"All Time"}}
+             )
+in
+    Source
+
+============================================================

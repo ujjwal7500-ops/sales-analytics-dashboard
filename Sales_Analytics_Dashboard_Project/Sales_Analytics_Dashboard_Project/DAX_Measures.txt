@@ -1,0 +1,234 @@
+============================================================
+  POWER BI CAPSTONE PROJECT — DAX MEASURES
+  Project: Sales Analytics Dashboard
+============================================================
+
+Paste each measure into Power BI:
+  Modeling → New Measure → paste code → Enter
+
+------------------------------------------------------------
+TABLE: _Measures  (create a blank table to hold all measures)
+------------------------------------------------------------
+
+── 1. CORE REVENUE & PROFIT ──────────────────────────────
+
+Total Revenue =
+SUM(Sales[Revenue])
+
+Total COGS =
+SUM(Sales[COGS])
+
+Total Profit =
+SUM(Sales[Profit])
+
+Profit Margin % =
+DIVIDE([Total Profit], [Total Revenue], 0) * 100
+
+Total Orders =
+DISTINCTCOUNT(Sales[OrderID])
+
+Total Quantity =
+SUM(Sales[Quantity])
+
+Average Order Value =
+DIVIDE([Total Revenue], [Total Orders], 0)
+
+
+── 2. TIME INTELLIGENCE ──────────────────────────────────
+
+Revenue YTD =
+TOTALYTD([Total Revenue], DateTable[Date])
+
+Revenue MTD =
+TOTALMTD([Total Revenue], DateTable[Date])
+
+Revenue QTD =
+TOTALQTD([Total Revenue], DateTable[Date])
+
+Revenue LY =
+CALCULATE([Total Revenue],
+    SAMEPERIODLASTYEAR(DateTable[Date]))
+
+Revenue YoY Growth =
+DIVIDE(
+    [Total Revenue] - [Revenue LY],
+    [Revenue LY],
+    0
+) * 100
+
+Revenue MoM Growth =
+VAR CurrentMonth = [Total Revenue]
+VAR PrevMonth    = CALCULATE([Total Revenue],
+                       DATEADD(DateTable[Date], -1, MONTH))
+RETURN
+DIVIDE(CurrentMonth - PrevMonth, PrevMonth, 0) * 100
+
+Profit LY =
+CALCULATE([Total Profit],
+    SAMEPERIODLASTYEAR(DateTable[Date]))
+
+Profit YoY Growth =
+DIVIDE(
+    [Total Profit] - [Profit LY],
+    [Profit LY],
+    0
+) * 100
+
+
+── 3. TARGET vs ACTUAL ────────────────────────────────────
+
+Total Target =
+SUM(Targets[Target])
+
+Achievement % =
+DIVIDE([Total Revenue], [Total Target], 0) * 100
+
+Target Gap =
+[Total Target] - [Total Revenue]
+
+Above Target =
+IF([Achievement %] >= 100, "✅ On Track", "⚠ Below Target")
+
+
+── 4. CUSTOMER ANALYTICS ─────────────────────────────────
+
+Unique Customers =
+DISTINCTCOUNT(Sales[CustomerID])
+
+Revenue per Customer =
+DIVIDE([Total Revenue], [Unique Customers], 0)
+
+New Customers =
+CALCULATE(
+    DISTINCTCOUNT(Sales[CustomerID]),
+    FILTER(
+        Sales,
+        CALCULATE(
+            MIN(Sales[OrderDate]),
+            ALLEXCEPT(Sales, Sales[CustomerID])
+        ) = MIN(Sales[OrderDate])
+    )
+)
+
+Top 10 Customer Revenue =
+CALCULATE(
+    [Total Revenue],
+    TOPN(10, VALUES(Customers[CustomerID]),
+         [Total Revenue], DESC)
+)
+
+
+── 5. PRODUCT ANALYTICS ──────────────────────────────────
+
+Best Selling Product =
+CALCULATE(
+    FIRSTNONBLANK(Products[ProductName], 1),
+    TOPN(1, VALUES(Products[ProductName]),
+         [Total Revenue], DESC)
+)
+
+Category Revenue Share % =
+DIVIDE(
+    [Total Revenue],
+    CALCULATE([Total Revenue], ALL(Products[Category])),
+    0
+) * 100
+
+Products Sold =
+DISTINCTCOUNT(Sales[ProductID])
+
+
+── 6. RANKING & DYNAMIC TEXT ─────────────────────────────
+
+Region Revenue Rank =
+RANKX(
+    ALL(Customers[Region]),
+    [Total Revenue],
+    ,
+    DESC,
+    DENSE
+)
+
+Revenue Status =
+SWITCH(
+    TRUE(),
+    [Achievement %] >= 110, "Exceeding",
+    [Achievement %] >= 100, "On Target",
+    [Achievement %] >= 80,  "Near Target",
+    "Below Target"
+)
+
+KPI Color =
+SWITCH(
+    [Revenue Status],
+    "Exceeding",    "#2ECC71",
+    "On Target",    "#27AE60",
+    "Near Target",  "#F39C12",
+    "#E74C3C"
+)
+
+
+── 7. DISCOUNT ANALYSIS ──────────────────────────────────
+
+Avg Discount % =
+AVERAGE(Sales[Discount]) * 100
+
+Revenue Lost to Discount =
+SUMX(
+    Sales,
+    Sales[UnitPrice] * Sales[Quantity] * Sales[Discount]
+)
+
+Discounted Orders =
+CALCULATE(
+    [Total Orders],
+    Sales[Discount] > 0
+)
+
+
+── 8. DYNAMIC PERIOD SELECTOR ────────────────────────────
+-- Create a disconnected table "Period" with values: MTD, QTD, YTD
+
+Dynamic Revenue =
+SWITCH(
+    SELECTEDVALUE(Period[Period]),
+    "MTD", [Revenue MTD],
+    "QTD", [Revenue QTD],
+    "YTD", [Revenue YTD],
+    [Total Revenue]
+)
+
+
+────────────────────────────────────────────────────────────
+  DATE TABLE (Power Query M — paste in blank query)
+────────────────────────────────────────────────────────────
+
+let
+    StartDate  = #date(2023, 1, 1),
+    EndDate    = #date(2024, 12, 31),
+    TotalDays  = Duration.Days(EndDate - StartDate) + 1,
+    DateList   = List.Dates(StartDate, TotalDays, #duration(1,0,0,0)),
+    DateTable  = Table.FromList(DateList,
+                     Splitter.SplitByNothing(), {"Date"}),
+    ChangedType = Table.TransformColumnTypes(DateTable,
+                     {{"Date", type date}}),
+    AddYear    = Table.AddColumn(ChangedType, "Year",
+                     each Date.Year([Date]), Int64.Type),
+    AddMonth   = Table.AddColumn(AddYear, "Month",
+                     each Date.Month([Date]), Int64.Type),
+    AddMonthName = Table.AddColumn(AddMonth, "MonthName",
+                     each Date.ToText([Date], "MMM"), type text),
+    AddQuarter = Table.AddColumn(AddMonthName, "Quarter",
+                     each "Q" & Text.From(Date.QuarterOfYear([Date])),
+                     type text),
+    AddWeekday = Table.AddColumn(AddQuarter, "Weekday",
+                     each Date.ToText([Date], "ddd"), type text),
+    AddYearMonth = Table.AddColumn(AddWeekday, "YearMonth",
+                     each Date.ToText([Date], "yyyy-MM"), type text),
+    AddMonthSort = Table.AddColumn(AddYearMonth, "MonthSort",
+                     each Date.Year([Date]) * 100 + Date.Month([Date]),
+                     Int64.Type)
+in
+    AddMonthSort
+
+============================================================
